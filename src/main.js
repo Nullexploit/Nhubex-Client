@@ -60,7 +60,7 @@ if (!gotLock) {
           { label: 'Configurar impresora', click: configurePrinter },
           { label: 'Impresión silenciosa', type: 'checkbox', checked: readConfig()?.printingConfigured === true, click: (item) => setPrintingConfigured(item.checked) },
           { type: 'separator' },
-          { label: 'Salir', click: () => { closingByMenu = true; app.quit(); } },
+          { label: 'Salir', enabled: false },
         ],
       },
     ]));
@@ -116,7 +116,7 @@ if (!gotLock) {
       { label: 'Configurar impresora', click: configurePrinter },
       { label: 'Impresión silenciosa', type: 'checkbox', checked: readConfig()?.printingConfigured === true, click: (item) => setPrintingConfigured(item.checked) },
       { type: 'separator' },
-      { label: 'Salir', click: () => { closingByMenu = true; app.quit(); } },
+      { label: 'Salir', enabled: false },
     ]));
     updateTrayMenu();
     createApplicationMenu();
@@ -137,7 +137,7 @@ if (!gotLock) {
         contextIsolation: true,
         nodeIntegration: false,
         sandbox: true,
-        devTools: false,
+        devTools: true,
         spellcheck: false,
         passwordAutofillEnabled: false,
       },

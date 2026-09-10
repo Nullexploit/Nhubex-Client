@@ -5,10 +5,15 @@
   <main class="card">
     <div class="brand"><span class="mark">N</span><span>NHUBEX</span></div>
     <h1>Conecta tu sistema POS</h1>
-    <p>Esta dirección se solicitará una sola vez. Para volver a configurarla, elimina los datos de caché de Nhubex Client.</p>
+    <p>Selecciona el ambiente en el que deseas ejecutar Nhubex. Para cambiarlo, elimina los datos de caché de Nhubex.</p>
     <form id="setup-form">
-      <label for="url">URL de Nhubex</label>
-      <input id="url" type="text" inputmode="url" autocomplete="off" placeholder="https://pos.tuempresa.com" autofocus required>
+      <label for="environment">Ambiente</label>
+      <select id="environment" autofocus required>
+        <option value="" selected disabled>Selecciona un ambiente</option>
+        <option value="alpha">Alpha</option>
+        <option value="beta">Beta</option>
+        <option value="production">Producción</option>
+      </select>
       <p id="error" class="error" role="alert"></p>
       <button type="submit">Abrir Nhubex</button>
     </form>

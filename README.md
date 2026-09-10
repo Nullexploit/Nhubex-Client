@@ -8,7 +8,10 @@ Cliente de escritorio para ejecutar Nhubex POS en un espacio controlado, sin dep
 - El botón de cerrar se intercepta y Nhubex permanece visible y activo. Para salir, usa **Salir** en el menú de la bandeja.
 - Los atajos normales de recarga (`F5`, `Ctrl/Cmd+R` y recarga forzada) están desactivados.
 - El pegado mediante `Ctrl/Cmd+V` está desactivado dentro de Nhubex y sus ventanas emergentes.
+- La opción **Salir** está deshabilitada para evitar cerrar el cliente desde el menú.
 - Solicita la URL en el primer inicio y la guarda en la caché de la aplicación. Al borrar la caché, vuelve a solicitarla.
+- En el primer inicio permite elegir el ambiente Alpha, Beta o Producción y abre la URL oficial correspondiente.
+- Las herramientas de desarrollador se pueden abrir con los atajos habituales de Chromium para limpiar caché.
 - No guarda contraseñas ni expone Node.js a la página POS.
 - La opción **Nhubex → Configurar impresora** abre el diálogo del sistema para seleccionar/configurar la impresora. **Nhubex → Impresión silenciosa** es una opción manual que se puede activar o desactivar; no cambia automáticamente después de imprimir. También está disponible desde el menú de la bandeja.
 - Soporta ventanas emergentes, notificaciones, audio, fullscreen, clipboard y conexiones web normales (HTTPS/HTTP, WebSocket y puertos accesibles desde el navegador).
