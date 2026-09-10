@@ -6,8 +6,8 @@
   "author": "Nhubex",
   "license": "MIT",
   "scripts": {
-    "start": "electron .",
-    "dev": "electron .",
+    "start": "electron . --disable-gpu",
+    "dev": "electron . --disable-gpu",
     "build": "electron-builder --publish never",
     "build:win": "electron-builder --win nsis",
     "build:mac": "electron-builder --mac dmg",
