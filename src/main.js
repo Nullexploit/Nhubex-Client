@@ -11,6 +11,9 @@ if (!gotLock) {
   let closingByMenu = false;
   let configPath;
 
+  app.commandLine.appendSwitch('disable-features', 'AutofillServerCommunication');
+  app.commandLine.appendSwitch('kiosk-printing');
+
   function getConfigPath() {
     return path.join(app.getPath('cache'), 'nhubex-client-config.json');
   }
@@ -38,30 +41,27 @@ if (!gotLock) {
 
   function configureNavigation() {
     const wc = mainWindow.webContents;
-    wc.on('before-input-event', (event, input) => {
+    const blockReloadShortcuts = (contents) => contents.on('before-input-event', (event, input) => {
       const key = String(input.key || '').toLowerCase();
       const reloadShortcut = input.key === 'F5'
         || (key === 'r' && (input.control || input.meta));
       if (reloadShortcut) event.preventDefault();
     });
-    wc.setWindowOpenHandler(({ url }) => {
-      const popup = new BrowserWindow({
-        parent: mainWindow,
+    blockReloadShortcuts(wc);
+    wc.setWindowOpenHandler(() => ({
+      action: 'allow',
+      overrideBrowserWindowOptions: {
         width: 1100,
         height: 760,
         minWidth: 700,
         minHeight: 500,
-        show: false,
         backgroundColor: '#0b1220',
         webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true, passwordAutofillEnabled: false },
-      });
-      popup.webContents.on('before-input-event', (event, input) => {
-        const key = String(input.key || '').toLowerCase();
-        if (input.key === 'F5' || (key === 'r' && (input.control || input.meta))) event.preventDefault();
-      });
+      },
+    }));
+    wc.on('did-create-window', (popup) => {
+      blockReloadShortcuts(popup.webContents);
       popup.once('ready-to-show', () => popup.show());
-      popup.loadURL(url);
-      return { action: 'deny' };
     });
     wc.on('will-navigate', (event, url) => {
       if (!/^https?:\/\//i.test(url)) event.preventDefault();
@@ -134,11 +134,12 @@ if (!gotLock) {
   });
   app.on('before-quit', () => { closingByMenu = true; });
   app.whenReady().then(() => {
-    app.commandLine.appendSwitch('disable-features', 'AutofillServerCommunication');
     session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback) => {
       callback(['media', 'notifications', 'fullscreen', 'clipboard-read', 'clipboard-sanitized-write'].includes(permission));
     });
-    ipcMain.on('print-page', (event) => event.sender.print({ silent: false, printBackground: true }));
+    ipcMain.on('print-page', (event) => event.sender.print({ silent: true, printBackground: true }, (_success, failureReason) => {
+      if (failureReason) console.error(`No se pudo imprimir: ${failureReason}`);
+    }));
     ipcMain.on('open-external', (_event, url) => { if (/^https?:\/\//i.test(url)) shell.openExternal(url); });
     createWindow();
   });
