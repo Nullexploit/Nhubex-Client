@@ -9,7 +9,7 @@ Cliente de escritorio para ejecutar Nhubex POS en un espacio controlado, sin dep
 - Los atajos normales de recarga (`F5`, `Ctrl/Cmd+R` y recarga forzada) están desactivados.
 - Solicita la URL en el primer inicio y la guarda en la caché de la aplicación. Al borrar la caché, vuelve a solicitarla.
 - No guarda contraseñas ni expone Node.js a la página POS.
-- La opción **Configurar impresora** abre el diálogo del sistema para seleccionar/configurar la impresora. **Impresión silenciosa** es una opción manual que se puede activar o desactivar desde el menú de la bandeja; no cambia automáticamente después de imprimir.
+- La opción **Nhubex → Configurar impresora** abre el diálogo del sistema para seleccionar/configurar la impresora. **Nhubex → Impresión silenciosa** es una opción manual que se puede activar o desactivar; no cambia automáticamente después de imprimir. También está disponible desde el menú de la bandeja.
 - Soporta ventanas emergentes, notificaciones, audio, fullscreen, clipboard y conexiones web normales (HTTPS/HTTP, WebSocket y puertos accesibles desde el navegador).
 - Genera instaladores para Windows (NSIS) y macOS (DMG).
 

@@ -48,6 +48,20 @@ if (!gotLock) {
     });
   }
 
+  function createApplicationMenu() {
+    Menu.setApplicationMenu(Menu.buildFromTemplate([
+      {
+        label: 'Nhubex',
+        submenu: [
+          { label: 'Configurar impresora', click: configurePrinter },
+          { label: 'Impresión silenciosa', type: 'checkbox', checked: readConfig()?.printingConfigured === true, click: (item) => setPrintingConfigured(item.checked) },
+          { type: 'separator' },
+          { label: 'Salir', click: () => { closingByMenu = true; app.quit(); } },
+        ],
+      },
+    ]));
+  }
+
   function normalizeUrl(value) {
     const candidate = value.trim();
     if (!/^https?:\/\//i.test(candidate)) return `https://${candidate}`;
@@ -88,7 +102,8 @@ if (!gotLock) {
   }
 
   function createTray() {
-    const icon = nativeImage.createFromDataURL('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/2jZ8WQAAAABJRU5ErkJggg==');
+    const iconSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18"><rect width="18" height="18" rx="4" fill="#0ea5e9"/><path d="M4 14V4h2l6 6V4h2v10h-2L6 8v6z" fill="white"/></svg>';
+    const icon = nativeImage.createFromDataURL(`data:image/svg+xml;base64,${Buffer.from(iconSvg).toString('base64')}`);
     tray = new Tray(icon);
     tray.setToolTip('Nhubex Client');
     const updateTrayMenu = () => tray.setContextMenu(Menu.buildFromTemplate([
@@ -99,6 +114,7 @@ if (!gotLock) {
       { label: 'Salir', click: () => { closingByMenu = true; app.quit(); } },
     ]));
     updateTrayMenu();
+    createApplicationMenu();
     tray.on('double-click', () => mainWindow.show());
   }
 
@@ -110,7 +126,7 @@ if (!gotLock) {
       minHeight: 650,
       title: 'Nhubex Client',
       backgroundColor: '#0b1220',
-      autoHideMenuBar: true,
+      autoHideMenuBar: false,
       webPreferences: {
         preload: path.join(__dirname, 'preload.js'),
         contextIsolation: true,
