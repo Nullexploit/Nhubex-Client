@@ -1,0 +1,31 @@
+{
+  "name": "nhubex-client",
+  "version": "1.0.0",
+  "description": "Cliente de escritorio para Nhubex POS",
+  "main": "src/main.js",
+  "author": "Nhubex",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron .",
+    "build": "electron-builder --publish never",
+    "build:win": "electron-builder --win nsis",
+    "build:mac": "electron-builder --mac dmg",
+    "build:dir": "electron-builder --dir"
+  },
+  "devDependencies": {
+    "electron": "^38.1.0",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "com.nhubex.client",
+    "productName": "Nhubex Client",
+    "asar": true,
+    "files": ["src/**/*", "package.json"],
+    "directories": { "output": "release" },
+    "mac": { "target": ["dmg", "zip"], "category": "public.app-category.business" },
+    "win": { "target": [{ "target": "nsis", "arch": ["x64", "ia32"] }] },
+    "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true, "createDesktopShortcut": true, "createStartMenuShortcut": true },
+    "publish": null
+  }
+}

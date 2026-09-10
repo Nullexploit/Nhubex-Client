@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="es">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Configurar Nhubex</title><link rel="stylesheet" href="setup.css"></head>
+<body>
+  <main class="card">
+    <div class="brand"><span class="mark">N</span><span>NHUBEX</span></div>
+    <h1>Conecta tu sistema POS</h1>
+    <p>Esta dirección se solicitará una sola vez. Para volver a configurarla, elimina los datos de caché de Nhubex Client.</p>
+    <form id="setup-form">
+      <label for="url">URL de Nhubex</label>
+      <input id="url" type="text" inputmode="url" autocomplete="off" placeholder="https://pos.tuempresa.com" autofocus required>
+      <p id="error" class="error" role="alert"></p>
+      <button type="submit">Abrir Nhubex</button>
+    </form>
+  </main>
+  <script src="setup.js"></script>
+</body>
+</html>
