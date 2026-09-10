@@ -38,6 +38,12 @@ if (!gotLock) {
 
   function configureNavigation() {
     const wc = mainWindow.webContents;
+    wc.on('before-input-event', (event, input) => {
+      const key = String(input.key || '').toLowerCase();
+      const reloadShortcut = input.key === 'F5'
+        || (key === 'r' && (input.control || input.meta));
+      if (reloadShortcut) event.preventDefault();
+    });
     wc.setWindowOpenHandler(({ url }) => {
       const popup = new BrowserWindow({
         parent: mainWindow,
@@ -48,6 +54,10 @@ if (!gotLock) {
         show: false,
         backgroundColor: '#0b1220',
         webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true, passwordAutofillEnabled: false },
+      });
+      popup.webContents.on('before-input-event', (event, input) => {
+        const key = String(input.key || '').toLowerCase();
+        if (input.key === 'F5' || (key === 'r' && (input.control || input.meta))) event.preventDefault();
       });
       popup.once('ready-to-show', () => popup.show());
       popup.loadURL(url);
