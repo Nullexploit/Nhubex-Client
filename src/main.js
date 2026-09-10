@@ -115,6 +115,7 @@ if (!gotLock) {
   app.on('second-instance', () => {
     if (mainWindow) { if (mainWindow.isMinimized()) mainWindow.restore(); mainWindow.show(); mainWindow.focus(); }
   });
+  app.on('before-quit', () => { closingByMenu = true; });
   app.whenReady().then(() => {
     app.commandLine.appendSwitch('disable-features', 'AutofillServerCommunication');
     session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback) => {
