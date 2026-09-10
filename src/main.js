@@ -39,6 +39,41 @@ if (!gotLock) {
     fs.writeFileSync(configPath, JSON.stringify(config), 'utf8');
   }
 
+  function openConsole() {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    mainWindow.show();
+    mainWindow.webContents.openDevTools({ mode: 'detach' });
+  }
+
+  async function uninstallNhubex() {
+    const result = await dialog.showMessageBox(mainWindow, {
+      type: 'warning',
+      title: 'Desinstalar Nhubex',
+      message: '¿Deseas borrar la configuración y los datos locales de Nhubex?',
+      detail: 'En Windows también se abrirá el desinstalador de Nhubex. Esta acción no borra datos del servidor POS.',
+      buttons: ['Cancelar', 'Borrar y desinstalar'],
+      defaultId: 0,
+      cancelId: 0,
+      noLink: true,
+    });
+    if (result.response !== 1) return;
+
+    try {
+      await session.defaultSession.clearStorageData();
+      await session.defaultSession.clearCache();
+      fs.rmSync(app.getPath('cache'), { recursive: true, force: true });
+    } catch (error) {
+      console.error(`No se pudieron borrar todos los datos locales: ${error.message}`);
+    }
+
+    if (process.platform === 'win32') {
+      const uninstaller = path.join(path.dirname(app.getPath('exe')), 'Uninstall Nhubex.exe');
+      if (fs.existsSync(uninstaller)) shell.openPath(uninstaller);
+    }
+    closingByMenu = true;
+    app.quit();
+  }
+
   function configurePrinter() {
     if (!mainWindow || mainWindow.isDestroyed()) return;
     mainWindow.show();
@@ -57,8 +92,15 @@ if (!gotLock) {
       {
         label: 'Nhubex',
         submenu: [
+          { label: 'Abrir consola', accelerator: process.platform === 'darwin' ? 'Command+Option+I' : 'F12', click: openConsole },
           { label: 'Configurar impresora', click: configurePrinter },
           { label: 'Impresión silenciosa', type: 'checkbox', checked: readConfig()?.printingConfigured === true, click: (item) => setPrintingConfigured(item.checked) },
+          {
+            label: 'Configuración',
+            submenu: [
+              { label: 'Desinstalar Nhubex', click: uninstallNhubex },
+            ],
+          },
           { type: 'separator' },
           { label: 'Salir', enabled: false },
         ],
@@ -95,6 +137,12 @@ if (!gotLock) {
     }));
     wc.on('did-create-window', (popup) => {
       blockReloadShortcuts(popup.webContents);
+      popup.webContents.on('dom-ready', () => {
+        if (readConfig()?.printingConfigured !== true) return;
+        popup.webContents.print({ silent: true, printBackground: true }, (_success, failureReason) => {
+          if (failureReason) console.error(`No se pudo imprimir silenciosamente: ${failureReason}`);
+        });
+      });
       popup.once('ready-to-show', () => {
         // Las ventanas about:blank suelen ser documentos temporales de impresión.
         // Se mantienen ocultas para que no aparezca un fondo oscuro detrás del diálogo.
@@ -113,8 +161,10 @@ if (!gotLock) {
     tray.setToolTip('Nhubex');
     const updateTrayMenu = () => tray.setContextMenu(Menu.buildFromTemplate([
       { label: 'Mostrar Nhubex', click: () => mainWindow.show() },
+      { label: 'Abrir consola', click: openConsole },
       { label: 'Configurar impresora', click: configurePrinter },
       { label: 'Impresión silenciosa', type: 'checkbox', checked: readConfig()?.printingConfigured === true, click: (item) => setPrintingConfigured(item.checked) },
+      { label: 'Configuración', submenu: [{ label: 'Desinstalar Nhubex', click: uninstallNhubex }] },
       { type: 'separator' },
       { label: 'Salir', enabled: false },
     ]));
