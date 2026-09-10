@@ -116,6 +116,15 @@ if (!gotLock) {
 
   function configureNavigation() {
     const wc = mainWindow.webContents;
+    const installPrintBridge = (contents) => {
+      contents.on('dom-ready', () => {
+        contents.executeJavaScript(`(() => {
+          if (!window.nhubex || window.__nhubexPrintBridgeInstalled) return;
+          Object.defineProperty(window, '__nhubexPrintBridgeInstalled', { value: true });
+          window.print = () => window.nhubex.print();
+        })();`, true).catch(() => {});
+      });
+    };
     const blockReloadShortcuts = (contents) => contents.on('before-input-event', (event, input) => {
       const key = String(input.key || '').toLowerCase();
       const reloadShortcut = input.key === 'F5'
@@ -124,6 +133,7 @@ if (!gotLock) {
       if (reloadShortcut || pasteShortcut) event.preventDefault();
     });
     blockReloadShortcuts(wc);
+    installPrintBridge(wc);
     wc.setWindowOpenHandler(() => ({
       action: 'allow',
       overrideBrowserWindowOptions: {
@@ -132,11 +142,12 @@ if (!gotLock) {
         minWidth: 700,
         minHeight: 500,
         backgroundColor: '#ffffff',
-        webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true, passwordAutofillEnabled: false },
+        webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true, preload: path.join(__dirname, 'preload.js'), passwordAutofillEnabled: false },
       },
     }));
     wc.on('did-create-window', (popup) => {
       blockReloadShortcuts(popup.webContents);
+      installPrintBridge(popup.webContents);
       popup.webContents.on('dom-ready', () => {
         if (readConfig()?.printingConfigured !== true) return;
         popup.webContents.print({ silent: true, printBackground: true }, (_success, failureReason) => {
