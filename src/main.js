@@ -92,7 +92,14 @@ if (!gotLock) {
     mainWindow.on('close', (event) => {
       if (!closingByMenu) {
         event.preventDefault();
-        mainWindow.hide();
+        mainWindow.show();
+        mainWindow.focus();
+      }
+    });
+    mainWindow.on('closed', () => {
+      if (!closingByMenu) {
+        mainWindow = null;
+        createWindow();
       }
     });
     configureNavigation();

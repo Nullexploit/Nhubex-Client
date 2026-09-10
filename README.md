@@ -5,7 +5,7 @@ Cliente de escritorio para ejecutar Nhubex POS en un espacio controlado, sin dep
 ## Características
 
 - Una sola instancia abierta; un segundo intento enfoca la ventana existente.
-- El botón de cerrar oculta la ventana y mantiene Nhubex activo en la bandeja del sistema. Para salir, usa **Salir** en el menú de la bandeja.
+- El botón de cerrar se intercepta y Nhubex permanece visible y activo. Para salir, usa **Salir** en el menú de la bandeja.
 - Solicita la URL en el primer inicio y la guarda en la caché de la aplicación. Al borrar la caché, vuelve a solicitarla.
 - No guarda contraseñas ni expone Node.js a la página POS.
 - Soporta impresión del sistema, ventanas emergentes, notificaciones, audio, fullscreen, clipboard y conexiones web normales (HTTPS/HTTP, WebSocket y puertos accesibles desde el navegador).
