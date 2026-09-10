@@ -43,9 +43,13 @@ if (!gotLock) {
     if (!mainWindow || mainWindow.isDestroyed()) return;
     mainWindow.show();
     mainWindow.focus();
-    mainWindow.webContents.print({ silent: false, printBackground: true }, (_success, failureReason) => {
-      if (failureReason) console.error(`No se pudo configurar la impresora: ${failureReason}`);
-    });
+    mainWindow.webContents.focus();
+    setTimeout(() => {
+      if (!mainWindow || mainWindow.isDestroyed()) return;
+      mainWindow.webContents.print({ silent: false, printBackground: true }, (_success, failureReason) => {
+        if (failureReason) console.error(`No se pudo configurar la impresora: ${failureReason}`);
+      });
+    }, 150);
   }
 
   function createApplicationMenu() {
@@ -74,7 +78,8 @@ if (!gotLock) {
       const key = String(input.key || '').toLowerCase();
       const reloadShortcut = input.key === 'F5'
         || (key === 'r' && (input.control || input.meta));
-      if (reloadShortcut) event.preventDefault();
+      const pasteShortcut = key === 'v' && (input.control || input.meta);
+      if (reloadShortcut || pasteShortcut) event.preventDefault();
     });
     blockReloadShortcuts(wc);
     wc.setWindowOpenHandler(() => ({
