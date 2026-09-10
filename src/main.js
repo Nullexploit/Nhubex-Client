@@ -110,7 +110,7 @@ if (!gotLock) {
     const iconSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18"><rect width="18" height="18" rx="4" fill="#0ea5e9"/><path d="M4 14V4h2l6 6V4h2v10h-2L6 8v6z" fill="white"/></svg>';
     const icon = nativeImage.createFromDataURL(`data:image/svg+xml;base64,${Buffer.from(iconSvg).toString('base64')}`);
     tray = new Tray(icon);
-    tray.setToolTip('Nhubex Client');
+    tray.setToolTip('Nhubex');
     const updateTrayMenu = () => tray.setContextMenu(Menu.buildFromTemplate([
       { label: 'Mostrar Nhubex', click: () => mainWindow.show() },
       { label: 'Configurar impresora', click: configurePrinter },
@@ -129,7 +129,7 @@ if (!gotLock) {
       height: 900,
       minWidth: 1024,
       minHeight: 650,
-      title: 'Nhubex Client',
+      title: 'Nhubex',
       backgroundColor: '#0b1220',
       autoHideMenuBar: false,
       webPreferences: {

@@ -1,4 +1,4 @@
-# Nhubex Client
+# Nhubex
 
 Cliente de escritorio para ejecutar Nhubex POS en un espacio controlado, sin depender de Chrome.
 
