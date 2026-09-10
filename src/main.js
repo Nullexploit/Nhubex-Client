@@ -32,11 +32,20 @@ if (!gotLock) {
     fs.writeFileSync(configPath, JSON.stringify({ url, configuredAt: new Date().toISOString() }), 'utf8');
   }
 
-  function savePrintConfiguration() {
+  function setPrintingConfigured(enabled) {
     const config = readConfig() || {};
-    config.printingConfigured = true;
+    config.printingConfigured = enabled;
     fs.mkdirSync(path.dirname(configPath), { recursive: true });
     fs.writeFileSync(configPath, JSON.stringify(config), 'utf8');
+  }
+
+  function configurePrinter() {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    mainWindow.show();
+    mainWindow.focus();
+    mainWindow.webContents.print({ silent: false, printBackground: true }, (_success, failureReason) => {
+      if (failureReason) console.error(`No se pudo configurar la impresora: ${failureReason}`);
+    });
   }
 
   function normalizeUrl(value) {
@@ -78,11 +87,14 @@ if (!gotLock) {
     const icon = nativeImage.createFromDataURL('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/2jZ8WQAAAABJRU5ErkJggg==');
     tray = new Tray(icon);
     tray.setToolTip('Nhubex Client');
-    tray.setContextMenu(Menu.buildFromTemplate([
+    const updateTrayMenu = () => tray.setContextMenu(Menu.buildFromTemplate([
       { label: 'Mostrar Nhubex', click: () => mainWindow.show() },
+      { label: 'Configurar impresora', click: configurePrinter },
+      { label: 'Impresión silenciosa', type: 'checkbox', checked: readConfig()?.printingConfigured === true, click: (item) => setPrintingConfigured(item.checked) },
       { type: 'separator' },
       { label: 'Salir', click: () => { closingByMenu = true; app.quit(); } },
     ]));
+    updateTrayMenu();
     tray.on('double-click', () => mainWindow.show());
   }
 
@@ -148,7 +160,6 @@ if (!gotLock) {
       const silent = config.printingConfigured === true;
       event.sender.print({ silent, printBackground: true }, (success, failureReason) => {
         if (failureReason) console.error(`No se pudo imprimir: ${failureReason}`);
-        if (success && !silent) savePrintConfiguration();
       });
     });
     ipcMain.on('open-external', (_event, url) => { if (/^https?:\/\//i.test(url)) shell.openExternal(url); });
