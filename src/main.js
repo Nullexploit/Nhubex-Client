@@ -70,13 +70,17 @@ if (!gotLock) {
         height: 760,
         minWidth: 700,
         minHeight: 500,
-        backgroundColor: '#0b1220',
+        backgroundColor: '#ffffff',
         webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true, passwordAutofillEnabled: false },
       },
     }));
     wc.on('did-create-window', (popup) => {
       blockReloadShortcuts(popup.webContents);
-      popup.once('ready-to-show', () => popup.show());
+      popup.once('ready-to-show', () => {
+        // Las ventanas about:blank suelen ser documentos temporales de impresión.
+        // Se mantienen ocultas para que no aparezca un fondo oscuro detrás del diálogo.
+        if (popup.webContents.getURL() !== 'about:blank') popup.show();
+      });
     });
     wc.on('will-navigate', (event, url) => {
       if (!/^https?:\/\//i.test(url)) event.preventDefault();
