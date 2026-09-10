@@ -12,7 +12,6 @@ if (!gotLock) {
   let configPath;
 
   app.commandLine.appendSwitch('disable-features', 'AutofillServerCommunication');
-  app.commandLine.appendSwitch('kiosk-printing');
 
   function getConfigPath() {
     return path.join(app.getPath('cache'), 'nhubex-client-config.json');
@@ -31,6 +30,13 @@ if (!gotLock) {
     configPath = configPath || getConfigPath();
     fs.mkdirSync(path.dirname(configPath), { recursive: true });
     fs.writeFileSync(configPath, JSON.stringify({ url, configuredAt: new Date().toISOString() }), 'utf8');
+  }
+
+  function savePrintConfiguration() {
+    const config = readConfig() || {};
+    config.printingConfigured = true;
+    fs.mkdirSync(path.dirname(configPath), { recursive: true });
+    fs.writeFileSync(configPath, JSON.stringify(config), 'utf8');
   }
 
   function normalizeUrl(value) {
@@ -137,9 +143,14 @@ if (!gotLock) {
     session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback) => {
       callback(['media', 'notifications', 'fullscreen', 'clipboard-read', 'clipboard-sanitized-write'].includes(permission));
     });
-    ipcMain.on('print-page', (event) => event.sender.print({ silent: true, printBackground: true }, (_success, failureReason) => {
-      if (failureReason) console.error(`No se pudo imprimir: ${failureReason}`);
-    }));
+    ipcMain.on('print-page', (event) => {
+      const config = readConfig() || {};
+      const silent = config.printingConfigured === true;
+      event.sender.print({ silent, printBackground: true }, (success, failureReason) => {
+        if (failureReason) console.error(`No se pudo imprimir: ${failureReason}`);
+        if (success && !silent) savePrintConfiguration();
+      });
+    });
     ipcMain.on('open-external', (_event, url) => { if (/^https?:\/\//i.test(url)) shell.openExternal(url); });
     createWindow();
   });
