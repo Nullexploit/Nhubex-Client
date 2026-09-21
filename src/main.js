@@ -141,6 +141,7 @@ if (!gotLock) {
         height: 760,
         minWidth: 700,
         minHeight: 500,
+        show: false,
         backgroundColor: '#ffffff',
         webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true, preload: path.join(__dirname, 'preload.js'), passwordAutofillEnabled: false },
       },
@@ -155,8 +156,11 @@ if (!gotLock) {
         });
       });
       popup.once('ready-to-show', () => {
-        // Las ventanas about:blank suelen ser documentos temporales de impresión.
-        // Se mantienen ocultas para que no aparezca un fondo oscuro detrás del diálogo.
+        // Solo se muestran pop-ups que realmente cargan una página; las descargas
+        // y documentos temporales de impresión permanecen ocultos.
+        if (popup.webContents.getURL() !== 'about:blank') popup.show();
+      });
+      popup.webContents.on('did-finish-load', () => {
         if (popup.webContents.getURL() !== 'about:blank') popup.show();
       });
     });
@@ -240,6 +244,19 @@ if (!gotLock) {
   app.whenReady().then(() => {
     session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback) => {
       callback(['media', 'notifications', 'fullscreen', 'clipboard-read', 'clipboard-sanitized-write'].includes(permission));
+    });
+    session.defaultSession.on('will-download', (_event, item) => {
+      const downloadsPath = app.getPath('downloads');
+      const originalName = item.getFilename() || 'Nhubex-download';
+      const extension = path.extname(originalName);
+      const baseName = extension ? originalName.slice(0, -extension.length) : originalName;
+      let destination = path.join(downloadsPath, originalName);
+      let counter = 1;
+      while (fs.existsSync(destination)) {
+        destination = path.join(downloadsPath, `${baseName} (${counter})${extension}`);
+        counter += 1;
+      }
+      item.setSavePath(destination);
     });
     ipcMain.on('print-page', (event) => {
       const config = readConfig() || {};
