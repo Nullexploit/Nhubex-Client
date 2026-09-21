@@ -14,7 +14,8 @@ Cliente de escritorio para ejecutar Nhubex POS en un espacio controlado, sin dep
 - Las herramientas de desarrollador se pueden abrir con los atajos habituales de Chromium para limpiar caché.
 - También están disponibles directamente en **Nhubex → Abrir consola**.
 - No guarda contraseñas ni expone Node.js a la página POS.
-- La opción **Nhubex → Configurar impresora** abre el diálogo del sistema para seleccionar/configurar la impresora. **Nhubex → Impresión silenciosa** es una opción manual que se puede activar o desactivar; no cambia automáticamente después de imprimir. También está disponible desde el menú de la bandeja.
+- **Nhubex → Configurar impresora en Chrome** abre el ambiente configurado en Chrome para ajustar la impresión con el panel de Chrome. **Nhubex → Configurar impresora del sistema** abre el diálogo nativo. **Nhubex → Impresión silenciosa** es una opción manual que se puede activar o desactivar.
+- Las descargas muestran una notificación al iniciar y al terminar, y se guardan en la carpeta Descargas.
 - **Nhubex → Configuración → Desinstalar Nhubex** borra los datos locales y abre el desinstalador del sistema; no borra datos del servidor.
 - Soporta ventanas emergentes, notificaciones, audio, fullscreen, clipboard y conexiones web normales (HTTPS/HTTP, WebSocket y puertos accesibles desde el navegador).
 - Genera instaladores para Windows (NSIS) y macOS (DMG).

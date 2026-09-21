@@ -1,4 +1,5 @@
-const { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, session, shell, Tray } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, Notification, session, shell, Tray } = require('electron');
+const { spawn } = require('node:child_process');
 const path = require('node:path');
 const fs = require('node:fs');
 
@@ -87,13 +88,42 @@ if (!gotLock) {
     }, 150);
   }
 
+  function openPrinterConfigInChrome() {
+    const url = readConfig()?.url;
+    if (!url) return;
+    let chromePath;
+    if (process.platform === 'darwin') {
+      chromePath = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+    } else if (process.platform === 'win32') {
+      const programFiles = process.env.ProgramFiles || 'C:\\Program Files';
+      const programFilesX86 = process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)';
+      const localAppData = process.env.LOCALAPPDATA || '';
+      chromePath = [
+        path.join(programFiles, 'Google/Chrome/Application/chrome.exe'),
+        path.join(programFilesX86, 'Google/Chrome/Application/chrome.exe'),
+        path.join(localAppData, 'Google/Chrome/Application/chrome.exe'),
+      ].find((candidate) => candidate && fs.existsSync(candidate));
+    }
+    if (chromePath && fs.existsSync(chromePath)) {
+      spawn(chromePath, ['--new-window', url], { detached: true, stdio: 'ignore' }).unref();
+    } else {
+      shell.openExternal(url);
+    }
+  }
+
+  function notifyDownload(title, body) {
+    if (Notification.isSupported()) new Notification({ title, body }).show();
+    if (process.platform === 'win32' && tray?.displayBalloon) tray.displayBalloon({ title, content: body });
+  }
+
   function createApplicationMenu() {
     Menu.setApplicationMenu(Menu.buildFromTemplate([
       {
         label: 'Nhubex',
         submenu: [
           { label: 'Abrir consola', accelerator: process.platform === 'darwin' ? 'Command+Option+I' : 'F12', click: openConsole },
-          { label: 'Configurar impresora', click: configurePrinter },
+          { label: 'Configurar impresora en Chrome', click: openPrinterConfigInChrome },
+          { label: 'Configurar impresora del sistema', click: configurePrinter },
           { label: 'Impresión silenciosa', type: 'checkbox', checked: readConfig()?.printingConfigured === true, click: (item) => setPrintingConfigured(item.checked) },
           {
             label: 'Configuración',
@@ -177,7 +207,8 @@ if (!gotLock) {
     const updateTrayMenu = () => tray.setContextMenu(Menu.buildFromTemplate([
       { label: 'Mostrar Nhubex', click: () => mainWindow.show() },
       { label: 'Abrir consola', click: openConsole },
-      { label: 'Configurar impresora', click: configurePrinter },
+      { label: 'Configurar impresora en Chrome', click: openPrinterConfigInChrome },
+      { label: 'Configurar impresora del sistema', click: configurePrinter },
       { label: 'Impresión silenciosa', type: 'checkbox', checked: readConfig()?.printingConfigured === true, click: (item) => setPrintingConfigured(item.checked) },
       { label: 'Configuración', submenu: [{ label: 'Desinstalar Nhubex', click: uninstallNhubex }] },
       { type: 'separator' },
@@ -257,6 +288,11 @@ if (!gotLock) {
         counter += 1;
       }
       item.setSavePath(destination);
+      notifyDownload('Nhubex', `Descarga iniciada: ${originalName}`);
+      item.once('done', (_doneEvent, state) => {
+        if (state === 'completed') notifyDownload('Nhubex', `Descarga completada: ${path.basename(destination)}`);
+        else notifyDownload('Nhubex', `La descarga no se completó: ${originalName}`);
+      });
     });
     ipcMain.on('print-page', (event) => {
       const config = readConfig() || {};
