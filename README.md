@@ -31,7 +31,7 @@ npm install
 npm start
 ```
 
-Cada versión produce nombres de instalador únicos con versión y arquitectura (por ejemplo, `Nhubex-1.0.6-x64.exe` y `Nhubex-1.0.6-ia32.exe`). Incrementa `version` en `package.json` y `package-lock.json` para cada nueva entrega. Al publicar un tag `vX.Y.Z`, GitHub Actions compila Windows y adjunta los instaladores a la versión.
+Cada versión produce un instalador x64 con versión en el nombre (por ejemplo, `Nhubex-1.0.6-x64.exe`). Electron 44 ya no ofrece binarios Windows de 32 bits. Incrementa `version` en `package.json` y `package-lock.json` para cada nueva entrega. Al publicar un tag `vX.Y.Z`, GitHub Actions compila Windows y adjunta el instalador a la versión.
 
 Para probar el instalador local (no es necesario para el desarrollo; `npm start` ejecuta el cliente directamente):
 
