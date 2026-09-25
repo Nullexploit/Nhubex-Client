@@ -14,8 +14,10 @@ Cliente de escritorio para ejecutar Nhubex POS en un espacio controlado, sin dep
 - Las herramientas de desarrollador se pueden abrir con los atajos habituales de Chromium para limpiar caché.
 - También están disponibles directamente en **Nhubex → Abrir consola**.
 - No guarda contraseñas ni expone Node.js a la página POS.
-- **Nhubex → Configurar impresora en Chrome** abre el ambiente configurado en Chrome para ajustar la impresión con el panel de Chrome. **Nhubex → Configurar impresora del sistema** abre el diálogo nativo. **Nhubex → Impresión silenciosa** es una opción manual que se puede activar o desactivar.
-- Las descargas muestran una notificación al iniciar y al terminar, y se guardan en la carpeta Descargas.
+- **Nhubex → Ajustes de impresión** permite elegir impresora, papel, orientación, escala, márgenes y opciones de color/fondo. **Nhubex → Impresión silenciosa** activa o desactiva la impresión directa con esas preferencias guardadas.
+- Electron no ofrece dentro de la app la vista previa de impresión de Chrome; los ajustes de Nhubex son el panel de configuración y se aplican a sus impresiones silenciosas.
+- El panel incluye tamaños de hoja comunes y rollos de ticket de 58, 76.2, 80 y 88 mm de ancho. En rollos, Nhubex estima una altura según el contenido del documento (hasta 508 mm); el corte físico también depende del controlador de la impresora.
+- Las descargas se guardan en Descargas y muestran avisos tanto dentro de Nhubex como en el sistema operativo.
 - **Nhubex → Configuración → Desinstalar Nhubex** borra los datos locales y abre el desinstalador del sistema; no borra datos del servidor.
 - Soporta ventanas emergentes, notificaciones, audio, fullscreen, clipboard y conexiones web normales (HTTPS/HTTP, WebSocket y puertos accesibles desde el navegador).
 - Genera instaladores para Windows (NSIS) y macOS (DMG).
@@ -29,7 +31,9 @@ npm install
 npm start
 ```
 
-Para probar el instalador local:
+Cada versión produce nombres de instalador únicos con versión y arquitectura (por ejemplo, `Nhubex-1.0.6-x64.exe` y `Nhubex-1.0.6-ia32.exe`). Incrementa `version` en `package.json` y `package-lock.json` para cada nueva entrega. Al publicar un tag `vX.Y.Z`, GitHub Actions compila Windows y adjunta los instaladores a la versión.
+
+Para probar el instalador local (no es necesario para el desarrollo; `npm start` ejecuta el cliente directamente):
 
 ```bash
 npm run build:mac

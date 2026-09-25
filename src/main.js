@@ -1,5 +1,4 @@
 const { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, Notification, session, shell, Tray } = require('electron');
-const { spawn } = require('node:child_process');
 const path = require('node:path');
 const fs = require('node:fs');
 
@@ -9,6 +8,7 @@ if (!gotLock) {
 } else {
   let mainWindow;
   let tray;
+  let printSettingsWindow;
   let closingByMenu = false;
   let configPath;
 
@@ -30,7 +30,8 @@ if (!gotLock) {
   function saveConfig(url) {
     configPath = configPath || getConfigPath();
     fs.mkdirSync(path.dirname(configPath), { recursive: true });
-    fs.writeFileSync(configPath, JSON.stringify({ url, configuredAt: new Date().toISOString() }), 'utf8');
+    const config = readConfig() || {};
+    fs.writeFileSync(configPath, JSON.stringify({ ...config, url, configuredAt: new Date().toISOString() }), 'utf8');
   }
 
   function setPrintingConfigured(enabled) {
@@ -38,6 +39,69 @@ if (!gotLock) {
     config.printingConfigured = enabled;
     fs.mkdirSync(path.dirname(configPath), { recursive: true });
     fs.writeFileSync(configPath, JSON.stringify(config), 'utf8');
+  }
+
+  function getPrintOptions(printRequest = {}) {
+    const saved = readConfig()?.printSettings || {};
+    const options = {
+      silent: readConfig()?.printingConfigured === true,
+      printBackground: saved.printBackground === true,
+      color: saved.color !== false,
+      landscape: saved.orientation === 'landscape',
+      scaleFactor: Math.min(200, Math.max(10, Number(saved.scale) || 100)),
+      margins: { marginType: saved.marginType || 'default' },
+    };
+    if (saved.printerName) options.deviceName = saved.printerName;
+    const ticketWidths = { 'ticket-58': 58000, 'ticket-76': 76200, 'ticket-80': 80000, 'ticket-88': 88000 };
+    if (ticketWidths[saved.paperSize]) {
+      const contentHeightPx = Number(printRequest.contentHeightPx);
+      const scale = options.scaleFactor / 100;
+      const marginTopMm = saved.marginType === 'custom' ? Number(saved.marginTop) || 0 : 4;
+      const marginBottomMm = saved.marginType === 'custom' ? Number(saved.marginBottom) || 0 : 4;
+      const measuredHeightMicrons = Number.isFinite(contentHeightPx) && contentHeightPx > 0
+        ? Math.ceil(contentHeightPx * 25400 / 96 * scale + (marginTopMm + marginBottomMm + 4) * 1000)
+        : 508000;
+      // Electron requires a fixed media height. Use the document's measured content height
+      // for receipt rolls, with a conservative 508 mm cap and a 60 mm minimum.
+      options.pageSize = { width: ticketWidths[saved.paperSize], height: Math.max(60000, Math.min(508000, measuredHeightMicrons)) };
+    } else if (saved.paperSize) {
+      options.pageSize = saved.paperSize;
+    }
+    if (saved.marginType === 'custom') {
+      const mmToPixels = (mm) => Math.max(0, Number(mm) || 0) * 96 / 25.4;
+      options.margins = {
+        marginType: 'custom',
+        top: mmToPixels(saved.marginTop),
+        bottom: mmToPixels(saved.marginBottom),
+        left: mmToPixels(saved.marginLeft),
+        right: mmToPixels(saved.marginRight),
+      };
+    }
+    return options;
+  }
+
+  function savePrintSettings(settings) {
+    const config = readConfig() || {};
+    const finiteNumber = (value, fallback, min, max) => {
+      const number = Number(value);
+      return Number.isFinite(number) ? Math.min(max, Math.max(min, number)) : fallback;
+    };
+    config.printSettings = {
+      printerName: typeof settings.printerName === 'string' ? settings.printerName : '',
+      paperSize: ['A4', 'A5', 'Letter', 'Legal', 'Tabloid', 'ticket-58', 'ticket-76', 'ticket-80', 'ticket-88'].includes(settings.paperSize) ? settings.paperSize : 'Letter',
+      orientation: settings.orientation === 'landscape' ? 'landscape' : 'portrait',
+      scale: finiteNumber(settings.scale, 100, 10, 200),
+      marginType: ['default', 'none', 'printableArea', 'custom'].includes(settings.marginType) ? settings.marginType : 'default',
+      marginTop: finiteNumber(settings.marginTop, 10, 0, 100),
+      marginBottom: finiteNumber(settings.marginBottom, 10, 0, 100),
+      marginLeft: finiteNumber(settings.marginLeft, 10, 0, 100),
+      marginRight: finiteNumber(settings.marginRight, 10, 0, 100),
+      printBackground: settings.printBackground === true,
+      color: settings.color !== false,
+    };
+    fs.mkdirSync(path.dirname(configPath), { recursive: true });
+    fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf8');
+    return config.printSettings;
   }
 
   function openConsole() {
@@ -75,45 +139,53 @@ if (!gotLock) {
     app.quit();
   }
 
-  function configurePrinter() {
-    if (!mainWindow || mainWindow.isDestroyed()) return;
-    mainWindow.show();
-    mainWindow.focus();
-    mainWindow.webContents.focus();
-    setTimeout(() => {
-      if (!mainWindow || mainWindow.isDestroyed()) return;
-      mainWindow.webContents.print({ silent: false, printBackground: true }, (_success, failureReason) => {
-        if (failureReason) console.error(`No se pudo configurar la impresora: ${failureReason}`);
-      });
-    }, 150);
-  }
-
-  function openPrinterConfigInChrome() {
-    const url = readConfig()?.url;
-    if (!url) return;
-    let chromePath;
-    if (process.platform === 'darwin') {
-      chromePath = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
-    } else if (process.platform === 'win32') {
-      const programFiles = process.env.ProgramFiles || 'C:\\Program Files';
-      const programFilesX86 = process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)';
-      const localAppData = process.env.LOCALAPPDATA || '';
-      chromePath = [
-        path.join(programFiles, 'Google/Chrome/Application/chrome.exe'),
-        path.join(programFilesX86, 'Google/Chrome/Application/chrome.exe'),
-        path.join(localAppData, 'Google/Chrome/Application/chrome.exe'),
-      ].find((candidate) => candidate && fs.existsSync(candidate));
+  function openPrintSettings() {
+    if (printSettingsWindow && !printSettingsWindow.isDestroyed()) {
+      printSettingsWindow.show();
+      printSettingsWindow.focus();
+      return;
     }
-    if (chromePath && fs.existsSync(chromePath)) {
-      spawn(chromePath, ['--new-window', url], { detached: true, stdio: 'ignore' }).unref();
-    } else {
-      shell.openExternal(url);
-    }
+    printSettingsWindow = new BrowserWindow({
+      width: 620,
+      height: 820,
+      minWidth: 540,
+      minHeight: 740,
+      title: 'Ajustes de impresión — Nhubex',
+      parent: mainWindow,
+      modal: true,
+      show: false,
+      autoHideMenuBar: true,
+      webPreferences: {
+        preload: path.join(__dirname, 'preload.js'),
+        contextIsolation: true,
+        nodeIntegration: false,
+        sandbox: true,
+      },
+    });
+    printSettingsWindow.once('ready-to-show', () => printSettingsWindow.show());
+    printSettingsWindow.on('closed', () => { printSettingsWindow = null; });
+    printSettingsWindow.loadFile(path.join(__dirname, 'print-settings.html'));
   }
 
   function notifyDownload(title, body) {
     if (Notification.isSupported()) new Notification({ title, body }).show();
     if (process.platform === 'win32' && tray?.displayBalloon) tray.displayBalloon({ title, content: body });
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      const message = JSON.stringify(`${title}: ${body}`);
+      mainWindow.webContents.executeJavaScript(`(() => {
+        let toast = document.getElementById('__nhubex-download-notice');
+        if (!toast) {
+          toast = document.createElement('div');
+          toast.id = '__nhubex-download-notice';
+          Object.assign(toast.style, { position: 'fixed', zIndex: '2147483647', right: '20px', bottom: '20px', maxWidth: '420px', padding: '14px 18px', borderRadius: '10px', background: '#10243b', color: '#fff', boxShadow: '0 5px 24px #0005', font: '14px -apple-system,BlinkMacSystemFont,sans-serif', opacity: '0', transition: 'opacity .2s' });
+          document.body.appendChild(toast);
+        }
+        toast.textContent = ${message};
+        toast.style.opacity = '1';
+        clearTimeout(window.__nhubexDownloadNoticeTimer);
+        window.__nhubexDownloadNoticeTimer = setTimeout(() => { toast.style.opacity = '0'; }, 5000);
+      })();`).catch(() => {});
+    }
   }
 
   function createApplicationMenu() {
@@ -122,8 +194,7 @@ if (!gotLock) {
         label: 'Nhubex',
         submenu: [
           { label: 'Abrir consola', accelerator: process.platform === 'darwin' ? 'Command+Option+I' : 'F12', click: openConsole },
-          { label: 'Configurar impresora en Chrome', click: openPrinterConfigInChrome },
-          { label: 'Configurar impresora del sistema', click: configurePrinter },
+          { label: 'Ajustes de impresión', click: openPrintSettings },
           { label: 'Impresión silenciosa', type: 'checkbox', checked: readConfig()?.printingConfigured === true, click: (item) => setPrintingConfigured(item.checked) },
           {
             label: 'Configuración',
@@ -151,7 +222,19 @@ if (!gotLock) {
         contents.executeJavaScript(`(() => {
           if (!window.nhubex || window.__nhubexPrintBridgeInstalled) return;
           Object.defineProperty(window, '__nhubexPrintBridgeInstalled', { value: true });
-          window.print = () => window.nhubex.print();
+          window.print = () => {
+            const root = document.documentElement;
+            const body = document.body;
+            let contentHeightPx = 0;
+            for (const element of body?.querySelectorAll('*') || []) {
+              const style = window.getComputedStyle(element);
+              if (style.display === 'none' || style.visibility === 'hidden' || style.position === 'fixed' || style.opacity === '0') continue;
+              const rect = element.getBoundingClientRect();
+              contentHeightPx = Math.max(contentHeightPx, rect.bottom + window.scrollY);
+            }
+            if (!contentHeightPx) contentHeightPx = Math.max(root?.scrollHeight || 0, body?.scrollHeight || 0);
+            window.nhubex.print({ contentHeightPx });
+          };
         })();`, true).catch(() => {});
       });
     };
@@ -179,12 +262,6 @@ if (!gotLock) {
     wc.on('did-create-window', (popup) => {
       blockReloadShortcuts(popup.webContents);
       installPrintBridge(popup.webContents);
-      popup.webContents.on('dom-ready', () => {
-        if (readConfig()?.printingConfigured !== true) return;
-        popup.webContents.print({ silent: true, printBackground: true }, (_success, failureReason) => {
-          if (failureReason) console.error(`No se pudo imprimir silenciosamente: ${failureReason}`);
-        });
-      });
       popup.once('ready-to-show', () => {
         // Solo se muestran pop-ups que realmente cargan una página; las descargas
         // y documentos temporales de impresión permanecen ocultos.
@@ -207,8 +284,7 @@ if (!gotLock) {
     const updateTrayMenu = () => tray.setContextMenu(Menu.buildFromTemplate([
       { label: 'Mostrar Nhubex', click: () => mainWindow.show() },
       { label: 'Abrir consola', click: openConsole },
-      { label: 'Configurar impresora en Chrome', click: openPrinterConfigInChrome },
-      { label: 'Configurar impresora del sistema', click: configurePrinter },
+      { label: 'Ajustes de impresión', click: openPrintSettings },
       { label: 'Impresión silenciosa', type: 'checkbox', checked: readConfig()?.printingConfigured === true, click: (item) => setPrintingConfigured(item.checked) },
       { label: 'Configuración', submenu: [{ label: 'Desinstalar Nhubex', click: uninstallNhubex }] },
       { type: 'separator' },
@@ -294,11 +370,17 @@ if (!gotLock) {
         else notifyDownload('Nhubex', `La descarga no se completó: ${originalName}`);
       });
     });
-    ipcMain.on('print-page', (event) => {
-      const config = readConfig() || {};
-      const silent = config.printingConfigured === true;
-      event.sender.print({ silent, printBackground: true }, (success, failureReason) => {
+    ipcMain.handle('print-settings:get', async () => {
+      const printers = mainWindow && !mainWindow.isDestroyed()
+        ? await mainWindow.webContents.getPrintersAsync()
+        : [];
+      return { settings: readConfig()?.printSettings || {}, printers: printers.map(({ name, displayName, isDefault }) => ({ name, displayName, isDefault })) };
+    });
+    ipcMain.handle('print-settings:save', (_event, settings) => savePrintSettings(settings || {}));
+    ipcMain.on('print-page', (event, printRequest) => {
+      event.sender.print(getPrintOptions(printRequest), (success, failureReason) => {
         if (failureReason) console.error(`No se pudo imprimir: ${failureReason}`);
+        else if (!success) console.warn('La solicitud de impresión no se completó.');
       });
     });
     ipcMain.on('open-external', (_event, url) => { if (/^https?:\/\//i.test(url)) shell.openExternal(url); });

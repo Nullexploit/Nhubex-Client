@@ -1,6 +1,6 @@
 {
   "name": "nhubex-client",
-  "version": "1.0.0",
+  "version": "1.0.6",
   "description": "Aplicación de escritorio Nhubex POS",
   "main": "src/main.js",
   "author": "Nhubex",
@@ -37,6 +37,7 @@
       "icon": "build/icon.png"
     },
     "win": {
+      "artifactName": "${productName}-${version}-${arch}.${ext}",
       "target": [
         {
           "target": "nsis",
