@@ -1,6 +1,6 @@
 {
   "name": "nhubex-client",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "Aplicación de escritorio Nhubex POS",
   "main": "src/main.js",
   "author": "Nhubex",
@@ -8,6 +8,8 @@
   "scripts": {
     "start": "electron --disable-gpu .",
     "dev": "electron --disable-gpu .",
+    "test": "node --test tests/printing.test.cjs",
+    "test:printing": "electron --disable-gpu tests/printing-electron.cjs",
     "build": "electron-builder --publish never",
     "build:win": "electron-builder --win nsis",
     "build:mac": "electron-builder --mac dmg",

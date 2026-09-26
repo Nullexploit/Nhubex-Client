@@ -15,6 +15,7 @@ Cliente de escritorio para ejecutar Nhubex POS en un espacio controlado, sin dep
 - También están disponibles directamente en **Nhubex → Abrir consola**.
 - No guarda contraseñas ni expone Node.js a la página POS.
 - **Nhubex → Ajustes de impresión** permite elegir impresora, papel, orientación, escala, márgenes y opciones de color/fondo. **Nhubex → Impresión silenciosa** activa o desactiva la impresión directa con esas preferencias guardadas.
+- Las solicitudes de impresión se capturan desde el inicio del documento, incluso en tickets generados con `document.write()`. Si el POS cierra el ticket después de pedir la impresión, el cierre espera la respuesta del controlador; las solicitudes repetidas mientras ese envío está pendiente no duplican el trabajo.
 - Electron no ofrece dentro de la app la vista previa de impresión de Chrome; los ajustes de Nhubex son el panel de configuración y se aplican a sus impresiones silenciosas.
 - El panel incluye tamaños de hoja comunes y rollos de ticket de 58, 76.2, 80 y 88 mm de ancho. En rollos, Nhubex estima una altura según el contenido del documento (hasta 508 mm); el corte físico también depende del controlador de la impresora.
 - Las descargas se guardan en Descargas y muestran avisos tanto dentro de Nhubex como en el sistema operativo.
@@ -30,6 +31,15 @@ Requiere Node.js 20+.
 npm install
 npm start
 ```
+
+Pruebas de impresión (sin enviar trabajos a impresoras físicas):
+
+```bash
+npm test
+npm run test:printing
+```
+
+La segunda prueba abre ventanas ocultas con un perfil temporal independiente y comprueba el flujo de Electron. La salida en papel y el corte de una mini printer deben validarse con su controlador y equipo reales.
 
 Cada versión produce un instalador x64 con versión en el nombre (por ejemplo, `Nhubex-1.0.6-x64.exe`). Electron 44 ya no ofrece binarios Windows de 32 bits. Incrementa `version` en `package.json` y `package-lock.json` para cada nueva entrega. Al publicar un tag `vX.Y.Z`, GitHub Actions compila Windows y adjunta el instalador a la versión.
 

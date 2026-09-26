@@ -1,6 +1,7 @@
 const { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, Notification, session, shell, Tray } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
+const { createPrintHandler } = require('./printing');
 
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
@@ -39,45 +40,6 @@ if (!gotLock) {
     config.printingConfigured = enabled;
     fs.mkdirSync(path.dirname(configPath), { recursive: true });
     fs.writeFileSync(configPath, JSON.stringify(config), 'utf8');
-  }
-
-  function getPrintOptions(printRequest = {}) {
-    const saved = readConfig()?.printSettings || {};
-    const options = {
-      silent: readConfig()?.printingConfigured === true,
-      printBackground: saved.printBackground === true,
-      color: saved.color !== false,
-      landscape: saved.orientation === 'landscape',
-      scaleFactor: Math.min(200, Math.max(10, Number(saved.scale) || 100)),
-      margins: { marginType: saved.marginType || 'default' },
-    };
-    if (saved.printerName) options.deviceName = saved.printerName;
-    const ticketWidths = { 'ticket-58': 58000, 'ticket-76': 76200, 'ticket-80': 80000, 'ticket-88': 88000 };
-    if (ticketWidths[saved.paperSize]) {
-      const contentHeightPx = Number(printRequest.contentHeightPx);
-      const scale = options.scaleFactor / 100;
-      const marginTopMm = saved.marginType === 'custom' ? Number(saved.marginTop) || 0 : 4;
-      const marginBottomMm = saved.marginType === 'custom' ? Number(saved.marginBottom) || 0 : 4;
-      const measuredHeightMicrons = Number.isFinite(contentHeightPx) && contentHeightPx > 0
-        ? Math.ceil(contentHeightPx * 25400 / 96 * scale + (marginTopMm + marginBottomMm + 4) * 1000)
-        : 508000;
-      // Electron requires a fixed media height. Use the document's measured content height
-      // for receipt rolls, with a conservative 508 mm cap and a 60 mm minimum.
-      options.pageSize = { width: ticketWidths[saved.paperSize], height: Math.max(60000, Math.min(508000, measuredHeightMicrons)) };
-    } else if (saved.paperSize) {
-      options.pageSize = saved.paperSize;
-    }
-    if (saved.marginType === 'custom') {
-      const mmToPixels = (mm) => Math.max(0, Number(mm) || 0) * 96 / 25.4;
-      options.margins = {
-        marginType: 'custom',
-        top: mmToPixels(saved.marginTop),
-        bottom: mmToPixels(saved.marginBottom),
-        left: mmToPixels(saved.marginLeft),
-        right: mmToPixels(saved.marginRight),
-      };
-    }
-    return options;
   }
 
   function savePrintSettings(settings) {
@@ -217,27 +179,6 @@ if (!gotLock) {
 
   function configureNavigation() {
     const wc = mainWindow.webContents;
-    const installPrintBridge = (contents) => {
-      contents.on('dom-ready', () => {
-        contents.executeJavaScript(`(() => {
-          if (!window.nhubex || window.__nhubexPrintBridgeInstalled) return;
-          Object.defineProperty(window, '__nhubexPrintBridgeInstalled', { value: true });
-          window.print = () => {
-            const root = document.documentElement;
-            const body = document.body;
-            let contentHeightPx = 0;
-            for (const element of body?.querySelectorAll('*') || []) {
-              const style = window.getComputedStyle(element);
-              if (style.display === 'none' || style.visibility === 'hidden' || style.position === 'fixed' || style.opacity === '0') continue;
-              const rect = element.getBoundingClientRect();
-              contentHeightPx = Math.max(contentHeightPx, rect.bottom + window.scrollY);
-            }
-            if (!contentHeightPx) contentHeightPx = Math.max(root?.scrollHeight || 0, body?.scrollHeight || 0);
-            window.nhubex.print({ contentHeightPx });
-          };
-        })();`, true).catch(() => {});
-      });
-    };
     const blockReloadShortcuts = (contents) => contents.on('before-input-event', (event, input) => {
       const key = String(input.key || '').toLowerCase();
       const reloadShortcut = input.key === 'F5'
@@ -246,7 +187,6 @@ if (!gotLock) {
       if (reloadShortcut || pasteShortcut) event.preventDefault();
     });
     blockReloadShortcuts(wc);
-    installPrintBridge(wc);
     wc.setWindowOpenHandler(() => ({
       action: 'allow',
       overrideBrowserWindowOptions: {
@@ -261,7 +201,6 @@ if (!gotLock) {
     }));
     wc.on('did-create-window', (popup) => {
       blockReloadShortcuts(popup.webContents);
-      installPrintBridge(popup.webContents);
       popup.once('ready-to-show', () => {
         // Solo se muestran pop-ups que realmente cargan una página; las descargas
         // y documentos temporales de impresión permanecen ocultos.
@@ -377,12 +316,19 @@ if (!gotLock) {
       return { settings: readConfig()?.printSettings || {}, printers: printers.map(({ name, displayName, isDefault }) => ({ name, displayName, isDefault })) };
     });
     ipcMain.handle('print-settings:save', (_event, settings) => savePrintSettings(settings || {}));
-    ipcMain.on('print-page', (event, printRequest) => {
-      event.sender.print(getPrintOptions(printRequest), (success, failureReason) => {
-        if (failureReason) console.error(`No se pudo imprimir: ${failureReason}`);
-        else if (!success) console.warn('La solicitud de impresión no se completó.');
-      });
-    });
+    ipcMain.handle('print-page', createPrintHandler({
+      readConfig,
+      getWindow: (contents) => BrowserWindow.fromWebContents(contents),
+      reportError: (reason) => {
+        console.error(`No se pudo imprimir: ${reason}`);
+        dialog.showMessageBox(mainWindow, {
+          type: 'error',
+          title: 'Nhubex — No se pudo imprimir',
+          message: 'El ticket no se pudo enviar a la impresora.',
+          detail: `${reason}\nRevisa la conexión y la impresora seleccionada en Nhubex → Ajustes de impresión.`,
+        }).catch(console.error);
+      },
+    }));
     ipcMain.on('open-external', (_event, url) => { if (/^https?:\/\//i.test(url)) shell.openExternal(url); });
     createWindow();
   });
