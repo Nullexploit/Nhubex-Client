@@ -15,6 +15,20 @@ legend { padding: 0 5px; font-weight: 600; }
 .check { flex-direction: row; align-items: center; gap: 9px; font-weight: 500; margin: 13px 0; }
 .check input { width: 17px; min-height: 17px; height: 17px; margin: 0; accent-color: #0878d1; }
 #status { min-height: 20px; color: #08723f; }
+.inline-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin: -6px 0 16px; }
+.inline-actions span { color: #647084; }
+.warning { border: 1px solid #e9b44c; background: #fff8e7; border-radius: 8px; padding: 12px; margin: -4px 0 16px; }
+.warning p { color: #754c00; margin-bottom: 10px; }
+.diagnostics { margin: 20px 0 16px; padding: 16px; border: 1px solid #dbe2ed; border-radius: 9px; background: #f8fafc; }
+.diagnostics h2 { margin: 0 0 13px; font-size: 16px; }
+.diagnostics dl { display: grid; grid-template-columns: minmax(130px, auto) 1fr; gap: 7px 14px; margin: 0 0 18px; }
+.diagnostics dt { font-weight: 650; }
+.diagnostics dd { margin: 0; overflow-wrap: anywhere; color: #4c596d; }
+.diagnostics .inline-actions { margin: 0; }
+.success { color: #08723f !important; }
+.error { color: #b42318 !important; }
+.warning-text { color: #8a5a00 !important; }
+button:disabled { cursor: wait; opacity: .6; }
 footer { display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid #e7ebf2; padding-top: 16px; margin-top: 8px; }
 button { border: 0; border-radius: 7px; padding: 10px 16px; background: #0878d1; color: white; font: inherit; font-weight: 650; cursor: pointer; }
 button.secondary { background: #e9edf3; color: #25324a; }

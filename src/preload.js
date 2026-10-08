@@ -4,6 +4,8 @@ contextBridge.exposeInMainWorld('nhubex', {
   print: (printRequest) => ipcRenderer.invoke('print-page', printRequest),
   getPrintSettings: () => ipcRenderer.invoke('print-settings:get'),
   savePrintSettings: (settings) => ipcRenderer.invoke('print-settings:save', settings),
+  printTest: () => ipcRenderer.invoke('print-settings:test'),
+  useSystemDefaultPrinter: () => ipcRenderer.invoke('print-settings:use-default'),
   openExternal: (url) => ipcRenderer.send('open-external', url),
   submitUrl: (url) => ipcRenderer.send('setup-url', url),
 });

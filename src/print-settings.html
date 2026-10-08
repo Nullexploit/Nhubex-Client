@@ -16,9 +16,18 @@
       <label>Impresora
         <select id="printerName"><option value="">Predeterminada del sistema</option></select>
       </label>
+      <div class="inline-actions">
+        <button type="button" class="secondary" id="refresh-printers">Actualizar impresoras</button>
+        <span id="printer-status" role="status">Consultando impresoras…</span>
+      </div>
+      <div id="printer-warning" class="warning" hidden>
+        <p></p>
+        <button type="button" class="secondary" id="use-default">Usar predeterminada del sistema</button>
+      </div>
       <div class="row">
         <label>Tamaño de papel
           <select id="paperSize">
+            <option value="driver-default">Usar tamaño predeterminado del controlador</option>
             <option value="Letter">Carta (Letter)</option><option value="A4">A4</option>
             <option value="A5">A5</option><option value="Legal">Legal</option><option value="Tabloid">Tabloid</option>
             <optgroup label="Rollos para mini printer">
@@ -53,6 +62,24 @@
       </fieldset>
       <label class="check"><input id="printBackground" type="checkbox"> Imprimir gráficos y fondos</label>
       <label class="check"><input id="color" type="checkbox"> Imprimir en color</label>
+      <section class="diagnostics" aria-labelledby="diagnostics-title">
+        <h2 id="diagnostics-title">Diagnóstico de impresión</h2>
+        <dl>
+          <dt>Sistema operativo</dt><dd id="diag-platform">—</dd>
+          <dt>Electron</dt><dd id="diag-electron">—</dd>
+          <dt>Impresión silenciosa</dt><dd id="diag-silent">—</dd>
+          <dt>Impresoras detectadas</dt><dd id="diag-printers">—</dd>
+          <dt>Predeterminada</dt><dd id="diag-default">—</dd>
+          <dt>Seleccionada</dt><dd id="diag-selected">—</dd>
+          <dt>Tamaño de papel</dt><dd id="diag-paper">—</dd>
+          <dt>Último intento</dt><dd id="diag-attempt">Sin intentos registrados</dd>
+          <dt>Último resultado</dt><dd id="diag-result">Sin resultados registrados</dd>
+        </dl>
+        <div class="inline-actions">
+          <button type="button" class="secondary" id="refresh-diagnostics">Actualizar diagnóstico</button>
+          <button type="button" id="print-test">Imprimir prueba</button>
+        </div>
+      </section>
       <p id="status" role="status"></p>
       <footer><button type="button" class="secondary" id="cancel">Cancelar</button><button type="submit">Guardar configuración</button></footer>
     </form>

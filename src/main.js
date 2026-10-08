@@ -1,7 +1,7 @@
 const { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, Notification, session, shell, Tray } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
-const { createPrintHandler } = require('./printing');
+const { createPrintHandler, queryPrinters, sanitizePrintSettings } = require('./printing');
 
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
@@ -12,6 +12,7 @@ if (!gotLock) {
   let printSettingsWindow;
   let closingByMenu = false;
   let configPath;
+  let printHandler;
 
   app.commandLine.appendSwitch('disable-features', 'AutofillServerCommunication');
 
@@ -42,28 +43,102 @@ if (!gotLock) {
     fs.writeFileSync(configPath, JSON.stringify(config), 'utf8');
   }
 
-  function savePrintSettings(settings) {
-    const config = readConfig() || {};
-    const finiteNumber = (value, fallback, min, max) => {
-      const number = Number(value);
-      return Number.isFinite(number) ? Math.min(max, Math.max(min, number)) : fallback;
-    };
-    config.printSettings = {
-      printerName: typeof settings.printerName === 'string' ? settings.printerName : '',
-      paperSize: ['A4', 'A5', 'Letter', 'Legal', 'Tabloid', 'ticket-58', 'ticket-76', 'ticket-80', 'ticket-88'].includes(settings.paperSize) ? settings.paperSize : 'Letter',
-      orientation: settings.orientation === 'landscape' ? 'landscape' : 'portrait',
-      scale: finiteNumber(settings.scale, 100, 10, 200),
-      marginType: ['default', 'none', 'printableArea', 'custom'].includes(settings.marginType) ? settings.marginType : 'default',
-      marginTop: finiteNumber(settings.marginTop, 10, 0, 100),
-      marginBottom: finiteNumber(settings.marginBottom, 10, 0, 100),
-      marginLeft: finiteNumber(settings.marginLeft, 10, 0, 100),
-      marginRight: finiteNumber(settings.marginRight, 10, 0, 100),
-      printBackground: settings.printBackground === true,
-      color: settings.color !== false,
-    };
+  function writeConfig(config) {
+    configPath = configPath || getConfigPath();
     fs.mkdirSync(path.dirname(configPath), { recursive: true });
     fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf8');
+  }
+
+  function savePrintSettings(settings) {
+    const config = readConfig() || {};
+    config.printSettings = sanitizePrintSettings(settings);
+    writeConfig(config);
     return config.printSettings;
+  }
+
+  function recordPrintResult(entry) {
+    try {
+      const config = readConfig() || {};
+      config.printDiagnostics = {
+        lastAttempt: entry.attempt,
+        lastResult: entry.result,
+      };
+      writeConfig(config);
+    } catch (error) {
+      console.error(`No se pudo guardar el último resultado de impresión: ${error.message}`);
+    }
+    if (!entry.result.success && !entry.result.canceled) {
+      const safeReason = String(entry.result.reason || 'Error desconocido').replace(/[\r\n]+/g, ' ').slice(0, 500);
+      const line = `${new Date().toISOString()} [${entry.result.code}] ${safeReason}\n`;
+      const logPath = path.join(app.getPath('logs'), 'printing.log');
+      fs.mkdirSync(path.dirname(logPath), { recursive: true });
+      try {
+        if (fs.existsSync(logPath) && fs.statSync(logPath).size > 262144) {
+          fs.copyFileSync(logPath, `${logPath}.previous`);
+          fs.truncateSync(logPath, 0);
+        }
+        fs.appendFileSync(logPath, line, 'utf8');
+      } catch (error) {
+        console.error(`No se pudo guardar el diagnóstico de impresión: ${error.message}`);
+      }
+    }
+  }
+
+  function printerWebContents() {
+    if (mainWindow && !mainWindow.isDestroyed()) return mainWindow.webContents;
+    if (printSettingsWindow && !printSettingsWindow.isDestroyed()) return printSettingsWindow.webContents;
+    return null;
+  }
+
+  async function getPrinterState() {
+    const contents = printerWebContents();
+    const query = contents
+      ? await queryPrinters(() => contents.getPrintersAsync())
+      : { printers: [], defaultPrinter: null, error: 'No hay una ventana disponible para consultar impresoras.' };
+    const config = readConfig() || {};
+    return {
+      ...query,
+      settings: sanitizePrintSettings(config.printSettings || {}),
+      diagnostics: {
+        platform: process.platform,
+        electronVersion: process.versions.electron,
+        silent: config.printingConfigured === true,
+        lastAttempt: config.printDiagnostics?.lastAttempt || null,
+        lastResult: config.printDiagnostics?.lastResult || null,
+      },
+    };
+  }
+
+  function escapeHtml(value) {
+    return String(value).replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]));
+  }
+
+  async function printTestReceipt() {
+    const state = await getPrinterState();
+    const selected = state.settings.printerName
+      ? state.printers.find((printer) => printer.name === state.settings.printerName)?.displayName || state.settings.printerName
+      : state.defaultPrinter?.displayName || 'Predeterminada del sistema';
+    const testWindow = new BrowserWindow({
+      show: false,
+      width: 420,
+      height: 640,
+      webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true },
+    });
+    const now = new Date().toLocaleString();
+    const html = `<!doctype html><html><head><meta charset="utf-8"><style>
+      body{font:14px sans-serif;margin:20px;color:#111}h1{font-size:18px;border-bottom:1px dashed #555;padding-bottom:10px}
+      dl{display:grid;grid-template-columns:auto 1fr;gap:7px 12px}dt{font-weight:bold}dd{margin:0;overflow-wrap:anywhere}
+    </style></head><body><h1>Nhubex — Prueba de impresión</h1><dl>
+      <dt>Fecha y hora</dt><dd>${escapeHtml(now)}</dd><dt>Sistema operativo</dt><dd>${escapeHtml(process.platform)}</dd>
+      <dt>Impresora</dt><dd>${escapeHtml(selected)}</dd><dt>Tamaño de papel</dt><dd>${escapeHtml(state.settings.paperSize)}</dd>
+      <dt>Estado del envío</dt><dd>Pendiente de confirmación del subsistema de impresión</dd>
+    </dl><p>Este comprobante es local y no contiene datos del POS.</p></body></html>`;
+    try {
+      await testWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
+      return await printHandler({ sender: testWindow.webContents }, { kind: 'test', contentHeightPx: 500 });
+    } finally {
+      if (!testWindow.isDestroyed()) testWindow.destroy();
+    }
   }
 
   function openConsole() {
@@ -108,8 +183,8 @@ if (!gotLock) {
       return;
     }
     printSettingsWindow = new BrowserWindow({
-      width: 620,
-      height: 820,
+      width: 720,
+      height: 900,
       minWidth: 540,
       minHeight: 740,
       title: 'Ajustes de impresión — Nhubex',
@@ -309,26 +384,37 @@ if (!gotLock) {
         else notifyDownload('Nhubex', `La descarga no se completó: ${originalName}`);
       });
     });
-    ipcMain.handle('print-settings:get', async () => {
-      const printers = mainWindow && !mainWindow.isDestroyed()
-        ? await mainWindow.webContents.getPrintersAsync()
-        : [];
-      return { settings: readConfig()?.printSettings || {}, printers: printers.map(({ name, displayName, isDefault }) => ({ name, displayName, isDefault })) };
-    });
+    ipcMain.handle('print-settings:get', getPrinterState);
     ipcMain.handle('print-settings:save', (_event, settings) => savePrintSettings(settings || {}));
-    ipcMain.handle('print-page', createPrintHandler({
+    ipcMain.handle('print-settings:test', printTestReceipt);
+    ipcMain.handle('print-settings:use-default', () => {
+      const settings = savePrintSettings({ ...(readConfig()?.printSettings || {}), printerName: '' });
+      return settings;
+    });
+    printHandler = createPrintHandler({
       readConfig,
       getWindow: (contents) => BrowserWindow.fromWebContents(contents),
-      reportError: (reason) => {
+      getPrinters: (contents) => contents.getPrintersAsync(),
+      reportResult: recordPrintResult,
+      reportError: (reason, code) => {
         console.error(`No se pudo imprimir: ${reason}`);
-        dialog.showMessageBox(mainWindow, {
+        const unavailable = code === 'printer-unavailable';
+        dialog.showMessageBox(printSettingsWindow || mainWindow, {
           type: 'error',
           title: 'Nhubex — No se pudo imprimir',
           message: 'El ticket no se pudo enviar a la impresora.',
           detail: `${reason}\nRevisa la conexión y la impresora seleccionada en Nhubex → Ajustes de impresión.`,
+          buttons: unavailable ? ['Cancelar', 'Abrir ajustes', 'Usar predeterminada del sistema'] : ['Aceptar', 'Abrir ajustes'],
+          defaultId: 0,
+          cancelId: 0,
+          noLink: true,
+        }).then(({ response }) => {
+          if (unavailable && response === 2) savePrintSettings({ ...(readConfig()?.printSettings || {}), printerName: '' });
+          else if ((!unavailable && response === 1) || (unavailable && response === 1)) openPrintSettings();
         }).catch(console.error);
       },
-    }));
+    });
+    ipcMain.handle('print-page', printHandler);
     ipcMain.on('open-external', (_event, url) => { if (/^https?:\/\//i.test(url)) shell.openExternal(url); });
     createWindow();
   });

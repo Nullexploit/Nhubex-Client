@@ -1,0 +1,48 @@
+name: Printing tests (multiplatform)
+
+on:
+  push:
+    branches:
+      - prudan
+  pull_request:
+    branches:
+      - prudan
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run unit tests
+        run: npm test
+
+      - name: Run Electron printing tests (Windows/macOS)
+        if: runner.os != 'Linux'
+        run: npm run test:printing
+
+      - name: Run Electron printing tests (Linux/Xvfb)
+        if: runner.os == 'Linux'
+        run: xvfb-run --auto-servernum npm run test:printing
+
+      - name: Validate unpacked application build
+        run: npm run build:dir

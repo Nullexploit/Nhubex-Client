@@ -3,6 +3,7 @@
   "version": "1.0.7",
   "description": "Aplicación de escritorio Nhubex POS",
   "main": "src/main.js",
+  "desktopName": "com.nhubex.client.desktop",
   "author": "Nhubex",
   "license": "MIT",
   "scripts": {
@@ -12,7 +13,8 @@
     "test:printing": "electron --disable-gpu tests/printing-electron.cjs",
     "build": "electron-builder --publish never",
     "build:win": "electron-builder --win nsis",
-    "build:mac": "electron-builder --mac dmg",
+    "build:mac": "electron-builder --mac dmg zip --x64 --arm64",
+    "build:linux": "electron-builder --linux AppImage deb --x64",
     "build:dir": "electron-builder --dir"
   },
   "devDependencies": {
@@ -31,12 +33,34 @@
       "output": "release"
     },
     "mac": {
+      "artifactName": "${productName}-${version}-${arch}.${ext}",
       "target": [
         "dmg",
         "zip"
       ],
       "category": "public.app-category.business",
       "icon": "build/icon.png"
+    },
+    "linux": {
+      "artifactName": "${productName}-${version}-${arch}.${ext}",
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "deb",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "category": "Office",
+      "icon": "build/icon.png",
+      "maintainer": "Nhubex",
+      "syncDesktopName": true
     },
     "win": {
       "artifactName": "${productName}-${version}-${arch}.${ext}",

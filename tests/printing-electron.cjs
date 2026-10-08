@@ -15,7 +15,7 @@ process.on('uncaughtException', (error) => { console.error(error); app.exit(1); 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 async function until(predicate, message) {
   const deadline = Date.now() + 5000;
-  while (!predicate()) {
+  while (!(await predicate())) {
     if (Date.now() > deadline) throw new Error(message);
     await sleep(25);
   }
@@ -41,9 +41,27 @@ let silent = true;
 const handler = createPrintHandler({
   readConfig: () => ({ printingConfigured: silent, printSettings: { printerName: 'Test_Printer', paperSize: 'ticket-80', marginType: 'none' } }),
   getWindow: (contents) => BrowserWindow.fromWebContents(contents),
+  getPrinters: async () => [{ name: 'Test_Printer', displayName: 'Test Printer', isDefault: true }],
   reportError: (message) => errors.push(message),
 });
 ipcMain.handle('print-page', handler);
+let settingsQueries = 0;
+let savedSettings = null;
+ipcMain.handle('print-settings:get', async () => {
+  settingsQueries += 1;
+  const printers = [{ name: 'Test_Printer', displayName: 'Test Printer', isDefault: true }];
+  if (settingsQueries > 1) printers.push({ name: 'New_Printer', displayName: 'New Printer', isDefault: false });
+  return {
+    settings: savedSettings || { printerName: 'Test_Printer', paperSize: 'driver-default', scale: 100, marginType: 'default', color: true },
+    printers,
+    defaultPrinter: { name: 'Test_Printer', displayName: 'Test Printer', isDefault: true },
+    error: null,
+    diagnostics: { platform: process.platform, electronVersion: process.versions.electron, silent: true, lastAttempt: null, lastResult: null },
+  };
+});
+ipcMain.handle('print-settings:save', (_event, settings) => { savedSettings = settings; return settings; });
+ipcMain.handle('print-settings:use-default', () => { savedSettings = { ...(savedSettings || {}), printerName: '' }; return savedSettings; });
+ipcMain.handle('print-settings:test', () => ({ success: true, reason: 'Trabajo aceptado por el subsistema de impresión.' }));
 
 app.whenReady().then(async () => {
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
@@ -134,7 +152,30 @@ app.whenReady().then(async () => {
     console.log(`PASS ${scenario}`);
     for (const win of BrowserWindow.getAllWindows()) win.destroy();
   }
+  const settingsWindow = new BrowserWindow({ show: false, webPreferences: {
+    preload: path.join(__dirname, '../src/preload.js'), contextIsolation: true, sandbox: true, nodeIntegration: false,
+  } });
+  await settingsWindow.loadFile(path.join(__dirname, '../src/print-settings.html'));
+  await until(() => settingsQueries >= 1, 'Print settings did not query printers');
+  const settingsView = await settingsWindow.webContents.executeJavaScript(`({
+    printer: document.querySelector('#printerName').value,
+    printerText: document.querySelector('#printerName').selectedOptions[0].textContent,
+    paper: document.querySelector('#paperSize').value,
+    count: document.querySelector('#diag-printers').textContent,
+  })`);
+  assert.equal(settingsView.printer, 'Test_Printer');
+  assert.match(settingsView.printerText, /Test Printer/);
+  assert.equal(settingsView.paper, 'driver-default');
+  assert.equal(settingsView.count, '1');
+  await settingsWindow.webContents.executeJavaScript("document.querySelector('#refresh-printers').click();void 0;");
+  await until(() => settingsQueries >= 2, 'Printer refresh did not query devices again');
+  await until(async () => (await settingsWindow.webContents.executeJavaScript("document.querySelector('#diag-printers').textContent")) === '2', 'Printer refresh did not update the displayed devices');
+  await settingsWindow.webContents.executeJavaScript("document.querySelector('#print-test').click();void 0;");
+  await until(() => savedSettings?.paperSize === 'driver-default', 'Test print did not persist current configuration');
+  await until(async () => (await settingsWindow.webContents.executeJavaScript("document.querySelector('#status').textContent")).includes('aceptó'), 'Test print result was not shown');
+  console.log('PASS print-settings-refresh-diagnostics-and-test');
+  settingsWindow.destroy();
   server.close();
-  console.log(`All ${scenarios.length} Electron printing scenarios passed. No physical jobs sent.`);
+  console.log(`All ${scenarios.length + 1} Electron printing scenarios passed. No physical jobs sent.`);
   app.exit(0);
 }).catch((error) => { console.error(error); server.close(); app.exit(1); });
